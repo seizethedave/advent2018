@@ -13,14 +13,12 @@ def go():
         if (marble % 23) == 0:
             marbles.rotate(7)
             play_score = marble + marbles.popleft()
+            scores[player] += play_score
+            max_score = max(max_score, scores[player])
         else:
             # Regular.
             marbles.rotate(-2)
             marbles.appendleft(marble)
-            play_score = 0
-
-        scores[player] += play_score
-        max_score = max(max_score, scores[player])
 
     print max_score
 
