@@ -12,8 +12,7 @@ def go():
     for marble, player in enumerate(islice(cycle(xrange(PLAYERS)), LAST_MARBLE + 1), start=1):
         if (marble % 23) == 0:
             marbles.rotate(7)
-            play_score = marble + marbles.popleft()
-            scores[player] += play_score
+            scores[player] += marble + marbles.popleft()
             max_score = max(max_score, scores[player])
         else:
             # Regular.
