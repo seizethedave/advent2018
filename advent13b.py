@@ -138,7 +138,6 @@ def go():
             return
 
         carts.sort()
-        # print carts
 
         for cart in carts:
             cart.tick()
