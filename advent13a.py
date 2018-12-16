@@ -1,5 +1,4 @@
 import itertools
-import copy
 
 DIR_UP = 0
 DIR_DOWN = 1
