@@ -1,10 +1,5 @@
 TARGET = tuple(reversed([2,8,6,0,5,1]))
 
-
-def list_find(haystack, needle, start=0):
-    pass
-
-
 def go():
     elf1 = 0
     elf2 = 1
@@ -23,7 +18,7 @@ def go():
                     # this is it.
                     print recipes - len(TARGET)
                     return
-            else:
+            elif len(tail_stack) < len(TARGET):
                 # Start tail over again.
                 tail_stack = list(TARGET)
 
