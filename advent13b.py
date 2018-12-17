@@ -36,32 +36,27 @@ class Cart(object):
                 self.direction = DIR_RIGHT
             elif self.grid[self.y][self.x] == "\\":
                 self.direction = DIR_LEFT
-            elif self.grid[self.y][self.x] == "+":
-                self.turn()
         elif self.direction == DIR_DOWN:
             self.y += 1
             if self.grid[self.y][self.x] == "/":
                 self.direction = DIR_LEFT
             elif self.grid[self.y][self.x] == "\\":
                 self.direction = DIR_RIGHT
-            elif self.grid[self.y][self.x] == "+":
-                self.turn()
         elif self.direction == DIR_LEFT:
             self.x -= 1
             if self.grid[self.y][self.x] == "/":
                 self.direction = DIR_DOWN
             elif self.grid[self.y][self.x] == "\\":
                 self.direction = DIR_UP
-            elif self.grid[self.y][self.x] == "+":
-                self.turn()
         elif self.direction == DIR_RIGHT:
             self.x += 1
             if self.grid[self.y][self.x] == "/":
                 self.direction = DIR_UP
             elif self.grid[self.y][self.x] == "\\":
                 self.direction = DIR_DOWN
-            elif self.grid[self.y][self.x] == "+":
-                self.turn()
+
+        if self.grid[self.y][self.x] == "+":
+            self.turn()
 
         assert self.grid[self.y][self.x] != ' '
 
