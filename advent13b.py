@@ -1,13 +1,14 @@
 import itertools
 
 DIR_UP = 0
-DIR_DOWN = 1
-DIR_LEFT = 2
-DIR_RIGHT = 3
+DIR_RIGHT = 1
+DIR_DOWN = 2
+DIR_LEFT = 3
+DIR_TOP = DIR_LEFT + 1
 
 TURN_STRAIGHT = 0
-TURN_LEFT = 1
-TURN_RIGHT = 2
+TURN_LEFT = -1
+TURN_RIGHT = 1
 
 class Cart(object):
     def __init__(self, num, cursor, x, y, grid):
@@ -26,28 +27,7 @@ class Cart(object):
         self.removed = False
 
     def turn(self):
-        turn = next(self.turn_choices)
-
-        if self.direction == DIR_UP:
-            if turn == TURN_LEFT:
-                self.direction = DIR_LEFT
-            elif turn == TURN_RIGHT:
-                self.direction = DIR_RIGHT
-        elif self.direction == DIR_DOWN:
-            if turn == TURN_LEFT:
-                self.direction = DIR_RIGHT
-            elif turn == TURN_RIGHT:
-                self.direction = DIR_LEFT
-        elif self.direction == DIR_LEFT:
-            if turn == TURN_LEFT:
-                self.direction = DIR_DOWN
-            elif turn == TURN_RIGHT:
-                self.direction = DIR_UP
-        elif self.direction == DIR_RIGHT:
-            if turn == TURN_LEFT:
-                self.direction = DIR_UP
-            elif turn == TURN_RIGHT:
-                self.direction = DIR_DOWN
+        self.direction = (self.direction + next(self.turn_choices)) % DIR_TOP
 
     def tick(self):
         if self.direction == DIR_UP:
