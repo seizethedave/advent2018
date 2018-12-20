@@ -69,6 +69,7 @@ class Player(object):
         self.y = y
         self.grid = grid
         self.hit_points = 200
+        self.alive = True
 
     def get_targets(self):
         return itertools.ifilter(
@@ -124,6 +125,7 @@ class Player(object):
         target = self.grid[targetY][targetX]
         target.hit_points -= ATTACK_POWER
         if target.hit_points <= 0:
+            target.alive = False
             self.grid[targetY][targetX] = OPEN
 
     def __repr__(self):
@@ -164,7 +166,7 @@ def iter_goblins(grid):
 def go():
     grid = []
 
-    with open("advent15-4.txt", "r") as f:
+    with open("advent15.txt", "r") as f:
         for y, line in enumerate(f):
             line = line.rstrip("\n")
             grid_line = []
@@ -186,10 +188,10 @@ def go():
 
     while True:
         for player in list(iter_players(grid)):
-            #print player
-            had_enemies = player.play_turn()
-            if not had_enemies:
-                break
+            if player.alive:
+                had_enemies = player.play_turn()
+                if not had_enemies:
+                    break
         else:
             rounds_completed += 1
 
@@ -200,11 +202,9 @@ def go():
         goblins = list(iter_goblins(grid))
 
         if not elves:
-            print [g.hit_points for g in goblins]
             print rounds_completed * sum(g.hit_points for g in goblins)
             break
         elif not goblins:
-            print [e.hit_points for e in elves]
             print rounds_completed * sum(e.hit_points for e in elves)
             break
 
