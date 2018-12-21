@@ -1,4 +1,3 @@
-import operator
 import pprint
 
 OPCODES = 16
