@@ -12,12 +12,8 @@ def go():
             indegree.setdefault(prerequisite, 0)
             indegree[dependent] += 1
 
-    roots = [step for step, deg in indegree.iteritems() if deg == 0]
-    heap = []
-
-    for root in roots:
-        heapq.heappush(heap, root)
-
+    heap = [step for step, deg in indegree.iteritems() if deg == 0]
+    heapq.heapify(heap)
     ordering = []
 
     while heap:
