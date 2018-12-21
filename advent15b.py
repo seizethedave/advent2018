@@ -2,8 +2,6 @@ import heapq
 import itertools
 import pprint
 
-ATTACK_POWER = 3
-
 class Wall(object):
     @property
     def grid_char(self):
@@ -64,12 +62,13 @@ def closest_target(source, targets, grid):
     return min(nearest)
 
 class Player(object):
-    def __init__(self, x, y, grid):
+    def __init__(self, x, y, grid, attack_power):
         self.x = x
         self.y = y
         self.grid = grid
         self.hit_points = 200
         self.alive = True
+        self.attack_power = attack_power
 
     def get_targets(self):
         return itertools.ifilter(
@@ -121,7 +120,7 @@ class Player(object):
     def attack(self, position):
         targetY, targetX = position
         target = self.grid[targetY][targetX]
-        target.hit_points -= ATTACK_POWER
+        target.hit_points -= self.attack_power
         if target.hit_points <= 0:
             target.alive = False
             self.grid[targetY][targetX] = OPEN
@@ -150,49 +149,75 @@ def iter_players(grid, obj_type=Player):
     )
 
 def go():
-    grid = []
+    def play(elf_power):
+        """
+        Returns (winning player type, number of losses in winning type)
+        """
+        grid = []
 
-    with open("advent15.txt", "r") as f:
-        for y, line in enumerate(f):
-            line = line.rstrip("\n")
-            grid_line = []
-            for x, char in enumerate(line):
-                if "#" == char:
-                    grid_line.append(WALL)
-                elif "." == char:
-                    grid_line.append(OPEN)
-                elif "G" == char:
-                    grid_line.append(Goblin(x, y, grid))
-                elif "E" == char:
-                    grid_line.append(Elf(x, y, grid))
+        with open("advent15.txt", "r") as f:
+            for y, line in enumerate(f):
+                line = line.rstrip("\n")
+                grid_line = []
+                for x, char in enumerate(line):
+                    if "#" == char:
+                        grid_line.append(WALL)
+                    elif "." == char:
+                        grid_line.append(OPEN)
+                    elif "G" == char:
+                        grid_line.append(Goblin(x, y, grid, 3))
+                    elif "E" == char:
+                        grid_line.append(Elf(x, y, grid, elf_power))
+                    else:
+                        assert False
                 else:
-                    assert False
+                    grid.append(grid_line)
+
+        rounds_completed = 0
+        elves_original = list(iter_players(grid, Elf))
+        goblins_original = list(iter_players(grid, Goblin))
+
+        while True:
+            for player in list(iter_players(grid)):
+                if player.alive:
+                    had_enemies = player.play_turn()
+                    if not had_enemies:
+                        break
             else:
-                grid.append(grid_line)
+                rounds_completed += 1
 
-    rounds_completed = 0
+            #print rounds_completed
+            #debug_grid(grid)
 
-    while True:
-        for player in list(iter_players(grid)):
-            if player.alive:
-                had_enemies = player.play_turn()
-                if not had_enemies:
-                    break
+            elves = list(iter_players(grid, Elf))
+            goblins = list(iter_players(grid, Goblin))
+
+            if not elves:
+                return (
+                    Goblin,
+                    rounds_completed * sum(g.hit_points for g in goblins),
+                    len(goblins_original) - len(goblins))
+            elif not goblins:
+                return (
+                    Elf,
+                    rounds_completed * sum(e.hit_points for e in elves),
+                    len(elves_original) - len(elves))
+
+    lo = 4
+    hi = 1000
+
+    # Binary search for minimal elf power where elves win without any dying.
+
+    while lo < hi:
+        trial = (lo + hi) // 2
+        winner, outcome, winners_died = play(trial)
+        print trial
+        if winner is Elf and winners_died == 0:
+            hi = trial
         else:
-            rounds_completed += 1
+            lo = trial + 1
 
-        print rounds_completed
-        debug_grid(grid)
-
-        elves = list(iter_players(grid, Elf))
-        goblins = list(iter_players(grid, Goblin))
-
-        if not elves:
-            print rounds_completed * sum(g.hit_points for g in goblins)
-            break
-        elif not goblins:
-            print rounds_completed * sum(e.hit_points for e in elves)
-            break
+    print lo, outcome
 
 if __name__ == "__main__":
     go()
