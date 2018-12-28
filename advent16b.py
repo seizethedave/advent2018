@@ -61,7 +61,7 @@ def iter_inputs():
             f.readline()
 
 def go():
-    codes = {code: set(ops) for code in range(OPCODES)}
+    codes = [set(ops) for code in range(OPCODES)]
 
     for register_before, command, register_after in iter_inputs():
         opcode, args = command[0], command[1:]
@@ -74,20 +74,20 @@ def go():
 
     final_opcodes = [None] * OPCODES
 
-    # Fixpoint algo to figure out opcodes.
+    # Fixed point algo to figure out opcodes.
     did_change = True
 
     while did_change:
         did_change = False
-        for opcode, members in codes.iteritems():
+        for opcode in range(OPCODES):
+            members = codes[opcode]
             if len(members) == 1:
-                did_change = True
                 op = members.pop()
                 final_opcodes[opcode] = op
-                for other_members in codes.itervalues():
+                for other_members in codes:
                     other_members.discard(op)
+                did_change = True
 
-    pprint.pprint(codes)
     pprint.pprint(final_opcodes)
 
     # Now execute program.
