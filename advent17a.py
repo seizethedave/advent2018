@@ -5,24 +5,43 @@ import time
 SPRING_X = None
 SPRING_Y = 0
 
-EMPTY = "."
-CLAY = "#"
+MAX_Y = None
+
 LIQUID_ACTIVE = "|"
 LIQUID_REST = "~"
 
-Drop = namedtuple("Drop", ('x', 'y'))
+class Clay(object):
+    def __init__(self):
+        self.display_char = "#"
+
+class Empty(object):
+    def __init__(self):
+        self.display_char = "."
+
+CLAY = Clay()
+EMPTY = Empty()
 
 class Drop(object):
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.display_char = "|"
 
     def __lt__(self, other):
-        return (self.y, self.x) >= (other.y, other.x)
+        return (MAX_Y - self.y, self.x) < (MAX_Y - other.y, other.x)
 
+    def flow(self, grid):
+        if grid[self.y + 1][self.x] == EMPTY:
+            grid[self.y][self.x] = EMPTY
+            self.y += 1
+            grid[self.y][self.x] = self
+            return True
+        else:
+            # Do nothing.
+            return False
 
 def iter_inputs():
-    with open("advent17.txt", "r") as f:
+    with open("advent17-test.txt", "r") as f:
         for line in f:
             left, right = line.split(", ")
             x_major = left.startswith("x=")
@@ -35,9 +54,8 @@ def iter_inputs():
                 yield (major, minor)[::1 if x_major else -1]
 
 def print_grid(grid):
-    for row in grid[:100]:
-        print "".join(row)
-    print ""
+    for row in grid[:50]:
+        print "".join(cell.display_char for cell in row)
 
 def parse_grid():
     min_x = 50000
@@ -62,8 +80,44 @@ def parse_grid():
 
     global SPRING_X
     SPRING_X = 500 - min_x + BUF_X
+    global MAX_Y
+    MAX_Y = max_y
 
     return grid
+
+def flow_horizontal(x, y, grid):
+    seen = set()
+
+    def flow_inner(x):
+        if x in seen:
+            return None
+        seen.add(x)
+        print seen
+
+        item = grid[y][x]
+
+        if item is EMPTY:
+            return x
+        elif item is CLAY:
+            return None
+        elif isinstance(item, Drop):
+            # Try to move it.
+            new_x = flow_inner(x - 1)
+
+            if new_x is None:
+                new_x = flow_inner(x + 1)
+
+            if new_x is not None:
+                grid[item.y][item.x] = EMPTY
+                item.x = new_x
+                grid[item.y][item.x] = item
+                return x
+            else:
+                return None
+        else:
+            assert False
+
+    return flow_inner(x)
 
 def go():
     grid = parse_grid()
@@ -71,37 +125,32 @@ def go():
 
     active_water = []
     did_change = True
-
-    def drop_flow(drop):
-        if grid[drop.y + 1][drop.x] == EMPTY:
-            return Drop(drop.x, drop.y + 1)
-        elif grid[drop.y][drop.x - 1] == EMPTY:
-            return Drop(drop.x - 1, drop.y)
-        elif grid[drop.y][drop.x + 1] == EMPTY:
-            return Drop(drop.x + 1, drop.y)
-        else:
-            # Do nothing.
-            return drop
+    i = 0
 
     while did_change:
+        i += 1
         did_change = False
-        heapq.heappush(active_water, Drop(SPRING_X, SPRING_Y))
-        grid[SPRING_Y][SPRING_X] = LIQUID_ACTIVE
-
+        new_drop = Drop(SPRING_X, SPRING_Y)
+        heapq.heappush(active_water, new_drop)
+        # assert grid[SPRING_Y][SPRING_X] is EMPTY
+        grid[SPRING_Y][SPRING_X] = new_drop
         next_active_water = []
 
         while active_water:
             drop = heapq.heappop(active_water)
-            flowed_drop = drop_flow(drop)
+            did_flow = drop.flow(grid)
 
-            if drop != flowed_drop:
-                grid[drop.y][drop.x] = EMPTY
-                grid[flowed_drop.y][flowed_drop.x] = LIQUID_ACTIVE
+            if not did_flow and grid[drop.y + 1][drop.x] is CLAY:
+                f = flow_horizontal(drop.x, drop.y, grid)
+                did_flow = f is not None
+
+            if did_flow:
                 did_change = True
 
-            heapq.heappush(next_active_water, flowed_drop)
+            heapq.heappush(next_active_water, drop)
 
         active_water = next_active_water
+        print i
         print_grid(grid)
         time.sleep(1/20.0)
 
