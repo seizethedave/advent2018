@@ -56,14 +56,12 @@ def flow_horizontal(x, y, grid):
 
     left_wall_pos = flow_horizontal_dir(x - 1, stride=-1)
     right_wall_pos = flow_horizontal_dir(x + 1, stride=+1)
-    solidify = left_wall_pos is not None and right_wall_pos is not None
 
-    if solidify:
+    if left_wall_pos is not None and right_wall_pos is not None:
         # Make the liquid solid.
         for cell in grid[y][left_wall_pos + 1:right_wall_pos]:
             assert isinstance(cell, Drop) and cell.is_active, y
             cell.is_active = False
-
 
 def flow_drop(x, y, grid):
     """
@@ -121,7 +119,7 @@ def count_water(grid):
     return sum(
         1 for _ in itertools.ifilter(
             lambda cell: isinstance(cell, Drop),
-            itertools.chain.from_iterable(grid[MIN_Y:MAX_Y + 1])
+            itertools.chain.from_iterable(itertools.islice(grid, MIN_Y, MAX_Y + 1))
         )
     )
 
