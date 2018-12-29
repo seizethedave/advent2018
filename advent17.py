@@ -115,10 +115,15 @@ def print_grid_all(grid):
     for row in grid:
         print_grid_row(row)
 
-def count_water(grid):
+def count_water(grid, resting_only=True):
+    if resting_only:
+        water_predicate = lambda cell: isinstance(cell, Drop) and not cell.is_active
+    else:
+        water_predicate = lambda cell: isinstance(cell, Drop)
+
     return sum(
         1 for _ in itertools.ifilter(
-            lambda cell: isinstance(cell, Drop),
+            water_predicate,
             itertools.chain.from_iterable(itertools.islice(grid, MIN_Y, MAX_Y + 1))
         )
     )
@@ -163,7 +168,7 @@ def go():
     grid = parse_grid()
     flow_drop(SPRING_X, SPRING_Y, grid)
     # print_grid_all(grid)
-    print count_water(grid)
+    print count_water(grid, resting_only=True)
 
 if __name__ == "__main__":
     go()
