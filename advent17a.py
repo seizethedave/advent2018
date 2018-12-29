@@ -1,10 +1,9 @@
-import heapq
-from collections import namedtuple
-import time
+import itertools
 
 SPRING_X = None
 SPRING_Y = 0
 
+MIN_Y = None
 MAX_Y = None
 
 LIQUID_ACTIVE = "|"
@@ -25,23 +24,77 @@ class Drop(object):
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.display_char = "|"
+        self.is_active = True
 
-    def __lt__(self, other):
-        return (MAX_Y - self.y, self.x) < (MAX_Y - other.y, other.x)
+    @property
+    def display_char(self):
+        return LIQUID_ACTIVE if self.is_active else LIQUID_REST
 
-    def flow(self, grid):
-        if grid[self.y + 1][self.x] == EMPTY:
-            grid[self.y][self.x] = EMPTY
-            self.y += 1
-            grid[self.y][self.x] = self
-            return True
-        else:
-            # Do nothing.
-            return False
+def is_solid(x, y, grid):
+    cell = grid[y][x]
+    return cell is CLAY or (isinstance(cell, Drop) and not cell.is_active)
+
+def flow_horizontal(x, y, grid):
+    def flow_horizontal_dir(x, stride):
+        # Returns x-coordinate of encountered clay wall, if any.
+        while True:
+            if grid[y][x] is EMPTY:
+                grid[y][x] = Drop(x, y)
+
+                if grid[y + 1][x] is EMPTY:
+                    flow_drop(x, y + 1, grid)
+
+                    if not is_solid(x + stride, y + 1, grid):
+                        # Doing the drop-flow below didn't extend for us to continue horizontally. Stop looking.
+                        return None
+            elif grid[y][x] is CLAY:
+                return x
+            elif isinstance(grid[y][x], Drop):
+                assert False
+
+            x += stride
+
+    left_wall_pos = flow_horizontal_dir(x - 1, stride=-1)
+    right_wall_pos = flow_horizontal_dir(x + 1, stride=+1)
+    solidify = left_wall_pos is not None and right_wall_pos is not None
+
+    if solidify:
+        # Make the liquid solid.
+        for cell in grid[y][left_wall_pos + 1:right_wall_pos]:
+            assert isinstance(cell, Drop) and cell.is_active, y
+            cell.is_active = False
+
+
+def flow_drop(x, y, grid):
+    """
+    Drop down until encountering a non-empty space. Then take action there.
+    """
+    start_y = y
+
+    while y <= MAX_Y:
+        cell = grid[y][x]
+
+        if cell is EMPTY:
+            grid[y][x] = Drop(x, y)
+        elif cell is CLAY:
+            break
+        elif isinstance(cell, Drop):
+            if cell.is_active:
+                # Dropping onto active liquid -- since flow is infinite, stop.
+                return
+            else:
+                break # resting drop
+
+        y += 1
+
+    # Now we've hit solid ground. Flow horizontally and continue upwards while still solid.
+
+    while is_solid(x, y, grid) and y > start_y:
+        y -= 1
+        flow_horizontal(x, y, grid)
 
 def iter_inputs():
-    with open("advent17-test.txt", "r") as f:
+    with open("advent17.txt", "r") as f:
         for line in f:
             left, right = line.split(", ")
             x_major = left.startswith("x=")
@@ -53,16 +106,38 @@ def iter_inputs():
             for minor in xrange(minor_from, minor_to + 1):
                 yield (major, minor)[::1 if x_major else -1]
 
-def print_grid(grid):
-    for row in grid[:50]:
-        print "".join(cell.display_char for cell in row)
+def print_grid_row(row):
+    print "".join(cell.display_char for cell in row)
+
+def print_grid(grid, y=0):
+    for row in grid[max(0, y-30):min(len(grid), y + 30)]:
+        print_grid_row(row)
+
+def print_grid_all(grid):
+    for row in grid:
+        print_grid_row(row)
+
+def count_water(grid):
+    return sum(
+        1 for _ in itertools.ifilter(
+            lambda cell: isinstance(cell, Drop),
+            itertools.chain.from_iterable(grid[MIN_Y:MAX_Y + 1])
+        )
+    )
 
 def parse_grid():
+    """
+    Returns a grid filled with the items specified in the input file.
+    This grid only contains the important part of the input, width-wise.
+    """
     min_x = 50000
     max_x = -50000
     min_y = 50000
     max_y = -50000
+
+    # Include some extra buffer space in both axes.
     BUF_X = 10
+    BUF_Y = 10
 
     for x, y in iter_inputs():
         min_x = min(min_x, x)
@@ -72,7 +147,7 @@ def parse_grid():
 
     grid = [
         [EMPTY] * (max_x - min_x + 2 * BUF_X)
-        for _ in xrange(max_y + 1)
+        for _ in xrange(max_y + BUF_Y)
     ]
 
     for x, y in iter_inputs():
@@ -80,79 +155,17 @@ def parse_grid():
 
     global SPRING_X
     SPRING_X = 500 - min_x + BUF_X
-    global MAX_Y
+    global MIN_Y, MAX_Y
+    MIN_Y = min_y
     MAX_Y = max_y
 
     return grid
 
-def flow_horizontal(x, y, grid):
-    seen = set()
-
-    def flow_inner(x):
-        if x in seen:
-            return None
-        seen.add(x)
-        print seen
-
-        item = grid[y][x]
-
-        if item is EMPTY:
-            return x
-        elif item is CLAY:
-            return None
-        elif isinstance(item, Drop):
-            # Try to move it.
-            new_x = flow_inner(x - 1)
-
-            if new_x is None:
-                new_x = flow_inner(x + 1)
-
-            if new_x is not None:
-                grid[item.y][item.x] = EMPTY
-                item.x = new_x
-                grid[item.y][item.x] = item
-                return x
-            else:
-                return None
-        else:
-            assert False
-
-    return flow_inner(x)
-
 def go():
     grid = parse_grid()
-    print_grid(grid)
-
-    active_water = []
-    did_change = True
-    i = 0
-
-    while did_change:
-        i += 1
-        did_change = False
-        new_drop = Drop(SPRING_X, SPRING_Y)
-        heapq.heappush(active_water, new_drop)
-        # assert grid[SPRING_Y][SPRING_X] is EMPTY
-        grid[SPRING_Y][SPRING_X] = new_drop
-        next_active_water = []
-
-        while active_water:
-            drop = heapq.heappop(active_water)
-            did_flow = drop.flow(grid)
-
-            if not did_flow and grid[drop.y + 1][drop.x] is CLAY:
-                f = flow_horizontal(drop.x, drop.y, grid)
-                did_flow = f is not None
-
-            if did_flow:
-                did_change = True
-
-            heapq.heappush(next_active_water, drop)
-
-        active_water = next_active_water
-        print i
-        print_grid(grid)
-        time.sleep(1/20.0)
+    flow_drop(SPRING_X, SPRING_Y, grid)
+    # print_grid_all(grid)
+    print count_water(grid)
 
 if __name__ == "__main__":
     go()
