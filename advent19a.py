@@ -6,7 +6,7 @@ ops = {op.__name__: op for op in advent16_ops.ops}
 
 def iter_inputs():
     """
-    Yields one instruction register, followed by a series of (op, (arg1, arg2, arg3)) tuples.
+    Yields one instruction register, followed by a series of (op_fn, (arg1, arg2, arg3)) tuples.
     """
     with open("advent19.txt", "r") as f:
         file_iter = iter(f)
@@ -14,8 +14,8 @@ def iter_inputs():
         yield ip
 
         for line in f:
-            op, args_str = line.rstrip("\n").split(" ", 1)
-            yield op, tuple(int(a) for a in args_str.split(" "))
+            op_str, args_str = line.rstrip("\n").split(" ", 1)
+            yield ops[op_str], tuple(int(a) for a in args_str.split(" "))
 
 def interpret(instruction_register, instructions):
     register_file = [0, 0, 0, 0, 0, 0]
@@ -25,12 +25,13 @@ def interpret(instruction_register, instructions):
         register_file[instruction_register] = instruction_pointer
 
         try:
-            op_str, args = instructions[instruction_pointer]
+            op, (a1, a2, a3) = instructions[instruction_pointer]
         except IndexError:
             break # Halt.
 
-        ops[op_str](register_file, *args)
+        op(register_file, a1, a2, a3)
         instruction_pointer = register_file[instruction_register] + 1
+        # print (instruction_pointer, op, args, register_file)
 
     return register_file
 
