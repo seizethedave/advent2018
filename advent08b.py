@@ -11,7 +11,7 @@ class Node(object):
             return sum(
                 self.children[meta - 1].value
                 for meta in self.metadata
-                if 1 <= meta <= len(self.children) 
+                if 1 <= meta <= len(self.children)
             )
 
     @classmethod
@@ -26,9 +26,7 @@ def go():
     with open("advent08.txt") as f:
         in_txt = f.read()
 
-    nums = (int(atom) for atom in in_txt.split())
-
-    root = Node.from_stream(iter(nums))
+    root = Node.from_stream(int(atom) for atom in in_txt.split())
     print root.value
 
 if __name__ == "__main__":

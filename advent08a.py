@@ -20,9 +20,7 @@ def go():
     with open("advent08.txt") as f:
         in_txt = f.read()
 
-    nums = (int(atom) for atom in in_txt.split())
-
-    root = Node.from_stream(iter(nums))
+    root = Node.from_stream(int(atom) for atom in in_txt.split())
     print root.sum_metadata()
 
 if __name__ == "__main__":
