@@ -18,15 +18,15 @@ def interpret(instruction_register, instructions):
     instruction_pointer = 0
 
     while True:
-        register_file[instruction_register] = instruction_pointer
-
         try:
             op, (a1, a2, a3) = instructions[instruction_pointer]
         except IndexError:
             break # Halt.
 
+        register_file[instruction_register] = instruction_pointer
         op(register_file, a1, a2, a3)
         instruction_pointer = register_file[instruction_register]
+
         # print (instruction_pointer, op.__name__, (a1, a2, a3), register_file)
 
         instruction_pointer += 1
