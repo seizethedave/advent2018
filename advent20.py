@@ -2,10 +2,10 @@ class Disjunction(object):
     def __init__(self, options):
         self.options = options
 
-    def debug_print(self, indent):
-        print " " * indent, "Disjunction:"
+    def debug_print(self, indent=0):
+        print "{}Disjunction:".format(" " * indent)
         for option in self.options:
-            option.debug_print(indent + 1)
+            option.debug_print(indent + 2)
 
 class Exp(object):
     def __init__(self, seq):
@@ -13,19 +13,19 @@ class Exp(object):
 
     def debug_print(self, indent=0):
         if len(self.seq) == 0:
-            print " " * indent, "Exp()"
+            print "{}Exp()".format(" " * indent)
             return
         elif len(self.seq) == 1 and isinstance(self.seq[0], str):
-            print " " * indent, "Exp({})".format(self.seq[0])
+            print "{}Exp({})".format(" " * indent, self.seq[0])
             return
 
-        print " " * indent, "Exp:"
+        print "{}Exp:".format(" " * indent)
 
         for item in self.seq:
             if isinstance(item, Exp) or isinstance(item, Disjunction):
-                item.debug_print(indent + 1)
+                item.debug_print(indent + 2)
             else:
-                print " " * (indent + 1), item
+                print "{}{}".format(" " * (indent + 2), item)
 
     @staticmethod
     def from_stream(stream):
@@ -48,13 +48,10 @@ class Exp(object):
 
         for c in stream:
             if c == "(":
-                if this_option:
-                    options.append(this_option)
-                this_option = []
                 # Consume in subexpression.
                 subexp = Exp.from_stream(stream)
                 if subexp:
-                    options.append(subexp)
+                    this_option.append(subexp)
             elif c == ")":
                 options.append(this_option)
                 break
@@ -64,14 +61,24 @@ class Exp(object):
                 this_option = []
             else:
                 # Regular ass character.
-                this_option.append(c)
+                if this_option and isinstance(this_option[-1], str):
+                    # Compress adjacent regular-ass characters into strings.
+                    this_option[-1] += c
+                else:
+                    this_option.append(c)
         else:
             if this_option:
                 options.append(this_option)
 
-        elements = [Exp("".join(seq)) if isinstance(seq, list) else seq for seq in options]
-        return Disjunction(elements) if is_disjunction else Exp(elements)
+        elements = [Exp(seq) for seq in options]
 
+        if is_disjunction:
+            return Disjunction(elements)
+        elif len(elements) == 1:
+            # Avoid Exp(single exp)
+            return elements[0]
+        else:
+            return Exp(elements)
 
 def parse_exp(exp):
     return Exp.from_stream(
@@ -87,14 +94,15 @@ def go():
     input_str = input_str.lstrip("^").rstrip("$")
     exp = Exp.from_string(iter(input_str))
 
-
 def test():
-    #navigate_expr("^EEN$")
-    #navigate_expr("^EEEEEN$")
-    #print list(navigate_expr("^E(S|W)N$"))
-    #print list(navigate_expr("^E(S|W(N|E(S|W)))E$"))
-
-    for expr in ["^E(SS|)E$", "^EN(W|E)$", "^E(S|N)N(W|E)$", "^E(S|W(N|E(S|W)))E$"]:
+    for expr in [
+            "^EN$",
+            "^EE|W(S|N)W|N$",
+            "^E(SS|)E$",
+            "^EN(W|E)$",
+            "^E(S|N)N(W|E)E$",
+            "^E(S|W(N|E(S|W)))E$"
+            ]:
         exp = parse_exp(expr)
         print expr
         exp.debug_print()
