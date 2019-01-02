@@ -61,6 +61,8 @@ class Exp(object):
                 is_disjunction = True
                 options.append(this_option)
                 this_option = []
+            elif c == "$":
+                this_option.append(c)
             else:
                 # Regular ass character.
                 if this_option and isinstance(this_option[-1], str):
@@ -83,11 +85,7 @@ class Exp(object):
             return Exp(elements)
 
 def parse_exp(exp):
-    return Exp.from_stream(
-        iter(
-            exp.lstrip("^").rstrip("$")
-        )
-    )
+    return Exp.from_stream(iter(exp.lstrip("^")))
 
 class Backtrack(object):
     def __init__(self, n):
@@ -95,23 +93,38 @@ class Backtrack(object):
     def __repr__(self):
         return "Backtrack({})".format(self.n)
 
-def navigate_exp(exp, offset=0):
+def navigate_exp(exp, offset=0, backtrack_stack=None):
     """
     Yields every item in the expression, following disjunctions. Backtracks are
     represented with an explicit Backtrack with an absolute offset to return to.
     """
-    # This isn't working yet.
+    if backtrack_stack is None:
+        backtrack_stack = []
+
     for item in exp.seq:
         if isinstance(item, str):
-            for c in item:
-                yield c
-            offset += len(item)
-        elif isinstance(item, Disjunction):
-            for i, option in enumerate(item.options, start=1):
-                for sub in navigate_exp(option, offset):
-                    yield sub
-                if i < len(item.options):
+            if item == "$":
+                # End of input. Process backtracks.
+                while backtrack_stack:
+                    offset, item, option = backtrack_stack.pop()
                     yield Backtrack(offset)
+                    for sub in navigate_exp(option, offset, backtrack_stack):
+                        yield sub
+            else:
+                for c in item:
+                    yield c
+                offset += len(item)
+        elif isinstance(item, Disjunction):
+            option_iter = iter(item.options)
+            option1 = next(option_iter)
+
+            # Save the rest for later.
+            backtrack_stack.extend(
+                (offset, item, option) for option in option_iter
+            )
+
+            for sub in navigate_exp(option1, offset, backtrack_stack):
+                yield sub
         else:
             assert False
 
@@ -125,7 +138,6 @@ def go():
     exp.debug_print()
     for step in navigate_exp(exp):
         print step
-
 
 
 def test():
