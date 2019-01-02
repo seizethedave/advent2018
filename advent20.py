@@ -1,3 +1,5 @@
+INDENT_STEP = 2
+
 class Disjunction(object):
     def __init__(self, options):
         self.options = options
@@ -5,7 +7,7 @@ class Disjunction(object):
     def debug_print(self, indent=0):
         print "{}Disjunction:".format(" " * indent)
         for option in self.options:
-            option.debug_print(indent + 2)
+            option.debug_print(indent + INDENT_STEP)
 
 class Exp(object):
     def __init__(self, seq):
@@ -23,9 +25,9 @@ class Exp(object):
 
         for item in self.seq:
             if isinstance(item, Exp) or isinstance(item, Disjunction):
-                item.debug_print(indent + 2)
+                item.debug_print(indent + INDENT_STEP)
             else:
-                print "{}{}".format(" " * (indent + 2), item)
+                print "{}{}".format(" " * (indent + INDENT_STEP), item)
 
     @staticmethod
     def from_stream(stream):
@@ -34,12 +36,12 @@ class Exp(object):
             E(SS|)E
         into a nested structure similar to:
             Exp(
-                Exp('E')
-                Junction(
-                    Exp('EE'),
+                Exp(E)
+                Disjunction(
+                    Exp(EE),
                     Exp()
                 ),
-                Exp('E')
+                Exp(E)
             )
         """
         options = []
@@ -75,7 +77,7 @@ class Exp(object):
         if is_disjunction:
             return Disjunction(elements)
         elif len(elements) == 1:
-            # Avoid Exp(single exp)
+            # Avoid Exp([Exp])
             return elements[0]
         else:
             return Exp(elements)
@@ -87,12 +89,44 @@ def parse_exp(exp):
         )
     )
 
+class Backtrack(object):
+    def __init__(self, n):
+        self.n = n
+    def __repr__(self):
+        return "Backtrack({})".format(self.n)
+
+def navigate_exp(exp, offset=0):
+    """
+    Yields every item in the expression, following disjunctions. Backtracks are
+    represented with an explicit Backtrack with an absolute offset to return to.
+    """
+    # This isn't working yet.
+    for item in exp.seq:
+        if isinstance(item, str):
+            for c in item:
+                yield c
+            offset += len(item)
+        elif isinstance(item, Disjunction):
+            for i, option in enumerate(item.options, start=1):
+                for sub in navigate_exp(option, offset):
+                    yield sub
+                if i < len(item.options):
+                    yield Backtrack(offset)
+        else:
+            assert False
+
 def go():
     with open("advent20.txt", "r") as input_file:
         input_str = input_file.read()
 
-    input_str = input_str.lstrip("^").rstrip("$")
-    exp = Exp.from_string(iter(input_str))
+    #input_str = "^ENWWW(NEEE|SSE(EE|N))$"
+    input_str = "^E(S|N)N(W|E)E$"
+    exp = parse_exp(input_str)
+    exp.debug_print()
+    for step in navigate_exp(exp):
+        print step
+
+
 
 def test():
     for expr in [
@@ -108,5 +142,5 @@ def test():
         exp.debug_print()
 
 if __name__ == "__main__":
-    test()
-    #go()
+    #test()
+    go()
