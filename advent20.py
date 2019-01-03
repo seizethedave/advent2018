@@ -1,88 +1,98 @@
 INDENT_STEP = 2
 
 class Disjunction(object):
-    def __init__(self, options):
+    def __init__(self, options, next_node):
         self.options = options
+        self.next = next_node
 
     def debug_print(self, indent=0):
         print "{}Disjunction:".format(" " * indent)
+        print "{}  options:".format(" " * indent)
         for option in self.options:
-            option.debug_print(indent + INDENT_STEP)
+            option.debug_print(indent + INDENT_STEP + 2)
+        if self.next is not None:
+            print "{}  next:".format(" " * indent)
+            self.next.debug_print(indent + INDENT_STEP + 2)
+        else:
+            print "{}  next: (None)".format(" " * indent)
 
 class Exp(object):
-    def __init__(self, seq):
-        self.seq = seq
+    def __init__(self, value, next_node=None):
+        self.value = value
+        self.next = next_node
 
     def debug_print(self, indent=0):
-        if len(self.seq) == 0:
-            print "{}Exp()".format(" " * indent)
-            return
-        elif len(self.seq) == 1 and isinstance(self.seq[0], str):
-            print "{}Exp({})".format(" " * indent, self.seq[0])
-            return
+        print "{}Exp({})".format(" " * indent, repr(self.value))
 
-        print "{}Exp:".format(" " * indent)
-
-        for item in self.seq:
-            if isinstance(item, Exp) or isinstance(item, Disjunction):
-                item.debug_print(indent + INDENT_STEP)
-            else:
-                print "{}{}".format(" " * (indent + INDENT_STEP), item)
+        if self.next is not None:
+            print "{}  next:".format(" " * indent)
+            self.next.debug_print(indent + INDENT_STEP + 2)
+        else:
+            print "{}  next: (None)".format(" " * indent)
 
     @staticmethod
     def from_stream(stream):
         """
         parses an expression like
-            E(SS|)E
+            ^E(SS|)E$
         into a nested structure similar to:
             Exp(
-                Exp(E)
-                Disjunction(
-                    Exp(EE),
-                    Exp()
+                val="e"
+                next=Disjunction(
+                    options=[
+                        Exp(
+                            val="SS",
+                            next=None
+                        ),
+                        Exp(
+                            val="",
+                            next=None
+                        )
+                    ],
+                    next=Exp(
+                        val=e,
+                        next=None
+                    )
                 ),
-                Exp(E)
             )
         """
+        value = ""
+        next_node = None
         options = []
-        this_option = []
-        is_disjunction = False
 
         for c in stream:
             if c == "(":
-                # Consume in subexpression.
-                subexp = Exp.from_stream(stream)
-                if subexp:
-                    this_option.append(subexp)
+                next_node = Exp.from_stream(stream)
             elif c == ")":
-                options.append(this_option)
+                next_node = Exp.from_stream(stream)
                 break
             elif c == "|":
-                is_disjunction = True
-                options.append(this_option)
-                this_option = []
+                if value:
+                    options.append(value)
+                    value = ""
             elif c == "$":
-                this_option.append(c)
+                next_node = TerminalExp()
             else:
-                # Regular ass character.
-                if this_option and isinstance(this_option[-1], str):
-                    # Compress adjacent regular-ass characters into strings.
-                    this_option[-1] += c
-                else:
-                    this_option.append(c)
-        else:
-            if this_option:
-                options.append(this_option)
+                value += c
+
+        options.append(value)
 
         elements = [Exp(seq) for seq in options]
 
-        if is_disjunction:
-            return Disjunction(elements)
+        if len(elements) == 0:
+            assert False
         elif len(elements) == 1:
-            # Avoid Exp([Exp])
+            elements[0].next = next_node
             return elements[0]
         else:
-            return Exp(elements)
+            return Disjunction(elements, next_node)
+
+class TerminalExp(Exp):
+    def __init__(self):
+        self.value = None
+        self.next = None
+    def debug_print(self, indent=0):
+        print "{}TERMINAL".format(" " * indent)
 
 def parse_exp(exp):
     return Exp.from_stream(iter(exp.lstrip("^")))
@@ -93,40 +103,31 @@ class Backtrack(object):
     def __repr__(self):
         return "Backtrack({})".format(self.n)
 
-def navigate_exp(exp, offset=0, backtrack_stack=None):
+def navigate_exp(exp, offset=0):
     """
-    Yields every item in the expression, following disjunctions. Backtracks are
-    represented with an explicit Backtrack with an absolute offset to return to.
+    Yields every item in the expression, following disjunctions.
+    Backtracks are emitted with an absolute length to return to.
     """
-    if backtrack_stack is None:
-        backtrack_stack = []
-
-    for item in exp.seq:
-        if isinstance(item, str):
-            if item == "$":
-                # End of input. Process backtracks.
-                while backtrack_stack:
-                    offset, item, option = backtrack_stack.pop()
-                    yield Backtrack(offset)
-                    for sub in navigate_exp(option, offset, backtrack_stack):
-                        yield sub
-            else:
-                for c in item:
-                    yield c
-                offset += len(item)
-        elif isinstance(item, Disjunction):
-            option_iter = iter(item.options)
-            option1 = next(option_iter)
-
-            # Save the rest for later.
-            backtrack_stack.extend(
-                (offset, item, option) for option in option_iter
-            )
-
-            for sub in navigate_exp(option1, offset, backtrack_stack):
-                yield sub
-        else:
-            assert False
+    if exp is None:
+        return
+    elif isinstance(exp, TerminalExp):
+        return
+    elif isinstance(exp, Exp):
+        for c in exp.value:
+            offset += 1
+            yield c
+        for c in navigate_exp(exp.next, offset):
+            yield c
+    elif isinstance(exp, Disjunction):
+        for ordinal, option in enumerate(exp.options, start=1):
+            backtrack_offset = offset
+            for c in navigate_exp(option, backtrack_offset):
+                backtrack_offset += 1
+                yield c
+            for c in navigate_exp(exp.next, backtrack_offset):
+                yield c
+            if ordinal < len(exp.options):
+                yield Backtrack(offset)
 
 def go():
     with open("advent20.txt", "r") as input_file:
@@ -138,7 +139,6 @@ def go():
     exp.debug_print()
     for step in navigate_exp(exp):
         print step
-
 
 def test():
     for expr in [
