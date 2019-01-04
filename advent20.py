@@ -74,8 +74,8 @@ class Exp(object):
     @staticmethod
     def from_stream(stream):
         """
-        parses an expression like
-            ^E(SS|)E$
+        parses a token stream like
+            ['^', 'E', '(', 'SS', '|', ')', 'E', '$']
         into a nested structure similar to:
             Exp(
                 val="e"
@@ -97,24 +97,27 @@ class Exp(object):
                 ),
             )
         """
-        value = ""
         next_node = None
         options = []
+        value = None
 
-        for c in stream:
-            if c == "(":
+        for token in stream:
+            if token == "(":
                 next_node = Exp.from_stream(stream)
-            elif c == ")":
+            elif token == ")":
                 next_node = Exp.from_stream(stream)
                 break
-            elif c == "|":
+            elif token == "|":
                 if value:
                     options.append(value)
-                    value = ""
-            elif c == "$":
+                    value = None
+            elif token == "^":
+                continue
+            elif token == "$":
                 next_node = TerminalExp()
             else:
-                value += c
+                # String literal.
+                value = token
 
         options.append(value)
 
@@ -136,7 +139,7 @@ class TerminalExp(Exp):
         print "{}TERMINAL".format(" " * indent)
 
 def parse_exp(exp):
-    return Exp.from_stream(iter(exp.lstrip("^")))
+    return Exp.from_stream(tokenize(iter(exp)))
 
 class Backtrack(object):
     def __init__(self, n):
