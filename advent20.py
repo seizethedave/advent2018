@@ -1,5 +1,46 @@
 INDENT_STEP = 2
 
+class TokState(object):
+    def __init__(self, peekchar):
+        self.peekchar = peekchar
+
+TOKEN_CHARS = {'^', '$', '(', ')', '|'}
+
+def tokenize(stream):
+    state = TokState(peekchar=None)
+
+    def peek():
+        if state.peekchar is None:
+            state.peekchar = next(stream)
+        return state.peekchar
+
+    def next_char():
+        if state.peekchar is not None:
+            c = state.peekchar
+            state.peekchar = None
+            return c
+        else:
+            return next(stream)
+
+    def read_string():
+        buf = []
+        try:
+            while peek() not in TOKEN_CHARS:
+                buf.append(next_char())
+        except StopIteration:
+            # String is at end of input stream, which is fine.
+            pass
+        return "".join(buf)
+
+    while True:
+        char = next_char()
+
+        if char in TOKEN_CHARS:
+            yield char
+        else:
+            # Consume and yield string literal.
+            yield char + read_string()
+
 class Disjunction(object):
     def __init__(self, options, next_node):
         self.options = options
@@ -154,5 +195,5 @@ def test():
         exp.debug_print()
 
 if __name__ == "__main__":
-    #test()
-    go()
+    test()
+    #go()
