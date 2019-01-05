@@ -1,45 +1,36 @@
-INDENT_STEP = 2
+from itertools import izip_longest, islice, tee
 
-class TokState(object):
-    def __init__(self, peekchar):
-        self.peekchar = peekchar
+INDENT_STEP = 2
 
 TOKEN_CHARS = {'^', '$', '(', ')', '|'}
 
-def tokenize(stream):
-    state = TokState(peekchar=None)
+def pairwise(s):
+    it1, it2 = tee(s)
+    return izip_longest(it1, islice(it2, 1, None), fillvalue=None)
 
-    def peek():
-        if state.peekchar is None:
-            state.peekchar = next(stream)
-        return state.peekchar
-
-    def next_char():
-        if state.peekchar is not None:
-            c = state.peekchar
-            state.peekchar = None
-            return c
-        else:
-            return next(stream)
-
-    def read_string():
-        buf = []
-        try:
-            while peek() not in TOKEN_CHARS:
-                buf.append(next_char())
-        except StopIteration:
-            # String is at end of input stream, which is fine.
-            pass
-        return "".join(buf)
+def tokenize(input_str):
+    pairwise_iter = pairwise(input_str)
 
     while True:
-        char = next_char()
+        char, next_char = next(pairwise_iter)
 
         if char in TOKEN_CHARS:
             yield char
+            if char == "|" and next_char in ")$|":
+                # Make parse easier by emitting empty literal between | and ).
+                yield ""
         else:
             # Consume and yield string literal.
-            yield char + read_string()
+            buf = [char]
+            try:
+                while next_char and next_char not in TOKEN_CHARS:
+                    buf.append(next_char)
+                    char, next_char = next(pairwise_iter)
+            except StopIteration:
+                # End of input.
+                pass
+            yield "".join(buf)
+
 
 class Disjunction(object):
     def __init__(self, options, next_node):
@@ -55,7 +46,7 @@ class Disjunction(object):
             print "{}  next:".format(" " * indent)
             self.next.debug_print(indent + INDENT_STEP + 2)
         else:
-            print "{}  next: (None)".format(" " * indent)
+            print "{}  next: nil".format(" " * indent)
 
 class Exp(object):
     def __init__(self, value, next_node=None):
@@ -69,13 +60,16 @@ class Exp(object):
             print "{}  next:".format(" " * indent)
             self.next.debug_print(indent + INDENT_STEP + 2)
         else:
-            print "{}  next: (None)".format(" " * indent)
+            print "{}  next: nil".format(" " * indent)
 
     @staticmethod
     def from_stream(stream):
         """
         parses a token stream like
-            ['^', 'E', '(', 'SS', '|', ')', 'E', '$']
+            ['^', 'E', '(', 'SS', '|', '', ')', 'E', '$']
+            ^E(S|N|E|)E$
+            ^E|W$
+            ^(E|W)$
         into a nested structure similar to:
             Exp(
                 val="e"
@@ -99,29 +93,29 @@ class Exp(object):
         """
         next_node = None
         options = []
-        value = None
 
         for token in stream:
+            #print "consumed", token
             if token == "(":
-                next_node = Exp.from_stream(stream)
+                break
             elif token == ")":
-                next_node = Exp.from_stream(stream)
                 break
             elif token == "|":
-                if value:
-                    options.append(value)
-                    value = None
+                pass
             elif token == "^":
-                continue
+                pass
             elif token == "$":
                 next_node = TerminalExp()
+                if not options:
+                    return next_node
             else:
                 # String literal.
-                value = token
-
-        options.append(value)
+                options.append(token)
 
         elements = [Exp(seq) for seq in options]
+
+        if next_node is None:
+            next_node = Exp.from_stream(stream)
 
         if len(elements) == 0:
             assert False
@@ -191,10 +185,12 @@ def test():
             "^E(SS|)E$",
             "^EN(W|E)$",
             "^E(S|N)N(W|E)E$",
+            "^(g)$",
             "^E(S|W(N|E(S|W)))E$"
             ]:
-        exp = parse_exp(expr)
         print expr
+        print list(tokenize(iter(expr)))
+        exp = parse_exp(expr)
         exp.debug_print()
 
 if __name__ == "__main__":
