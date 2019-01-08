@@ -31,7 +31,6 @@ def tokenize(input_str):
                 pass
             yield "".join(buf)
 
-
 class Disjunction(object):
     def __init__(self, options, next_node):
         self.options = options
@@ -62,69 +61,6 @@ class Exp(object):
         else:
             print "{}  next: nil".format(" " * indent)
 
-    @staticmethod
-    def from_stream(stream):
-        """
-        parses a token stream like
-            ['^', 'E', '(', 'SS', '|', '', ')', 'E', '$']
-            ^E(S|N|E|)E$
-            ^E|W$
-            ^(E|W)$
-        into a nested structure similar to:
-            Exp(
-                val="e"
-                next=Disjunction(
-                    options=[
-                        Exp(
-                            val="SS",
-                            next=None
-                        ),
-                        Exp(
-                            val="",
-                            next=None
-                        )
-                    ],
-                    next=Exp(
-                        val=e,
-                        next=None
-                    )
-                ),
-            )
-        """
-        next_node = None
-        options = []
-
-        for token in stream:
-            #print "consumed", token
-            if token == "(":
-                break
-            elif token == ")":
-                break
-            elif token == "|":
-                pass
-            elif token == "^":
-                pass
-            elif token == "$":
-                next_node = TerminalExp()
-                if not options:
-                    return next_node
-            else:
-                # String literal.
-                options.append(token)
-
-        elements = [Exp(seq) for seq in options]
-
-        if next_node is None:
-            next_node = Exp.from_stream(stream)
-
-        if len(elements) == 0:
-            assert False
-        elif len(elements) == 1:
-            elements[0].next = next_node
-            return elements[0]
-        else:
-            return Disjunction(elements, next_node)
-
 class TerminalExp(Exp):
     def __init__(self):
         self.value = None
@@ -132,8 +68,47 @@ class TerminalExp(Exp):
     def debug_print(self, indent=0):
         print "{}TERMINAL".format(" " * indent)
 
-def parse_exp(exp):
-    return Exp.from_stream(tokenize(iter(exp)))
+
+
+def parse_full_expression(input_str):
+    stream = pairwise(tokenize(iter(input_str)))
+    token, next_token = next(stream)
+    assert token == "^"
+    return parse_expression(token, next_token, stream)
+
+def parse_expression(token, next_token, stream):
+    if next_token == "(":
+        return parse_disjunction(stream)
+    else:
+        return parse_exp(stream)
+
+def parse_disjunction(stream):
+    token, next_token = next(stream)
+    assert token == "("
+    # (A|B)
+    options = []
+
+    while next_token != ")":
+        print token, next_token
+        if next_token is None:
+            assert False
+
+        token, next_token = next(stream)
+        if token == "|":
+            continue
+        else:
+            options.append(parse_expression(token, next_token, stream))
+
+    return Disjunction(options, parse_expression(token, next_token, stream))
+
+def parse_exp(stream):
+    """
+    ^EN(W|E)$
+    """
+    token, next_token = next(stream)
+    if token == "$":
+        return TerminalExp()
+    return Exp(token, parse_expression(token, next_token, stream))
 
 class Backtrack(object):
     def __init__(self, n):
@@ -173,7 +148,7 @@ def go():
 
     #input_str = "^ENWWW(NEEE|SSE(EE|N))$"
     input_str = "^E(S|N)N(W|E)E$"
-    exp = parse_exp(input_str)
+    exp = parse_full_expression(input_str)
     exp.debug_print()
     for step in navigate_exp(exp):
         print step
@@ -181,16 +156,16 @@ def go():
 def test():
     for expr in [
             "^EN$",
-            "^EE|W(S|N)W|N$",
-            "^E(SS|)E$",
-            "^EN(W|E)$",
-            "^E(S|N)N(W|E)E$",
-            "^(g)$",
-            "^E(S|W(N|E(S|W)))E$"
+            "^EEW(S|N)WN$",
+            #"^E(SS|)E$",
+            #"^EN(W|E)$",
+            #"^E(S|N)N(W|E)E$",
+            #"^(g|)$",
+            #"^E(S|W(N|E(S|W)))E$"
             ]:
         print expr
         print list(tokenize(iter(expr)))
-        exp = parse_exp(expr)
+        exp = parse_full_expression(expr)
         exp.debug_print()
 
 if __name__ == "__main__":
