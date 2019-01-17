@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <utility>
 #include <map>
 #include <forward_list>
@@ -48,17 +49,39 @@ public:
   std::forward_list<Point>* heads;
 };
 
+void debug(
+  const std::forward_list<Point>* heads,
+  const std::forward_list<std::forward_list<Point>*>* alternates)
+{
+  std::ostringstream heads_str;
+
+  for (auto p : *heads)
+  {
+    heads_str << "(" << p.first << "," << p.second << ") ";
+  }
+
+  std::ostringstream alternates_str;
+
+  for (auto h : *alternates)
+  {
+    for (auto p : *h)
+    {
+      alternates_str << "(" << p.first << "," << p.second << ") ";
+    }
+  }
+
+  std::cout <<
+    "heads = " << heads_str.str() <<
+    "alts  = " << alternates_str.str() <<
+    std::endl
+    ;
+}
+
 int main ()
 {
-  std::fstream input("advent20-1.txt", std::ios::in);
-  char ch;
   // ^E(NNN|)
   // (E|W)(NN|SS)
-  //     2
-  // (E|W)NNN(E(N|W)E)W
-  // (1|1)222(1 1|1)2)4
-  // E(E|N)N
-  // 1(1|1)2
+  // (E|W)N(E(N|W)E)W
 
   std::stack<ExpInfo*> depth_stack;
 
@@ -69,8 +92,14 @@ int main ()
   std::multimap<Point, Point> edges;
   char dx, dy;
 
+  std::fstream input("advent20-1.txt", std::ios::in);
+  char ch;
+
+  uint32_t offset = 0;
+
   while (std::char_traits<char>::not_eof(ch = input.get()))
   {
+    ++offset;
     if (ch == '^' || ch == '$')
     { }
     else if (ch == '(')
@@ -80,7 +109,8 @@ int main ()
       info->heads = heads;
       depth_stack.push(info);
       alternates = new std::forward_list<std::forward_list<Point>*>;
-      heads = new std::forward_list<Point>({std::make_pair(0, 0)});
+      // Copy heads from parent scope.
+      heads = new std::forward_list<Point>(*info->heads);
     }
     else if (ch == ')')
     {
@@ -91,19 +121,16 @@ int main ()
       depth_stack.pop();
       next_heads->clear();
 
-      for (auto parent_head : *parent_info->heads)
-      {
-        for (auto alternate_heads : *alternates)
-        {
-          for (auto my_head : *alternate_heads)
-          {
-            next_heads->emplace_front(
-              parent_head.first + my_head.first,
-              parent_head.second + my_head.second);
-          }
+      //debug(heads, alternates);
 
-          delete alternate_heads;
+      for (auto alternate_heads : *alternates)
+      {
+        for (auto my_head : *alternate_heads)
+        {
+          next_heads->push_front(my_head);
         }
+
+        //delete alternate_heads;
       }
 
       delete alternates;
@@ -112,11 +139,14 @@ int main ()
       alternates = parent_info->alternates;
       delete parent_info->heads;
       delete parent_info;
+
+      //debug(heads, alternates);
     }
     else if (ch == '|')
     {
       alternates->push_front(heads);
-      heads = new std::forward_list<Point>({std::make_pair(0, 0)});
+      ExpInfo* exp_info = depth_stack.top();
+      heads = new std::forward_list<Point>(*exp_info->heads);
     }
     else if (ch == '\n')
     { }
@@ -125,11 +155,14 @@ int main ()
       get_increment(ch, &dx, &dy);
       next_heads->clear();
 
+      uint32_t ct = 0;
+
       for (auto point : *heads)
       {
+        ct++;
         Point successor = std::make_pair(point.first + dx, point.second + dy);
-        std::cout << successor.first << " " << successor.second << std::endl;
-        edges.insert({point, successor});
+        std::cout << offset << " " << ct << " (" << ch << ") " << successor.first << " " << successor.second << std::endl;
+        // edges.insert({point, successor});
         next_heads->push_front(successor);
       }
 
